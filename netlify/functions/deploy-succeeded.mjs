@@ -9,6 +9,8 @@ const user = { name: 'user', description: 'Member', type: 6, required: true };
 const reason = { name: 'reason', description: 'Reason (shown in the audit log)', type: 3, required: false, max_length: 300 };
 
 export const COMMANDS = [
+  { name: 'announce', description: 'Post an announcement in #announcements as FrameUp', default_member_permissions: String(1 << 5), dm_permission: false,
+    options: [{ name: 'ping', description: 'Ping @everyone', type: 5, required: false }] },
   { name: 'check', description: 'Check a TikTok: views, likes and the quality TikTok serves', dm_permission: false,
     options: [{ name: 'link', description: 'TikTok video link', type: 3, required: true }] },
   { name: 'kick', description: 'Kick a member', default_member_permissions: KICK, dm_permission: false, options: [user, reason] },
