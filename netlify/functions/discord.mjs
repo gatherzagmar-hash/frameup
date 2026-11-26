@@ -49,7 +49,7 @@ export async function checkEmbed(url) {
         { name: '💬 Comments', value: short(d.stats?.comments), inline: true },
         { name: '🔁 Shares', value: short(d.stats?.shares), inline: true },
         { name: '🔖 Saves', value: short(d.stats?.saves), inline: true },
-        { name: '🎞️ Best quality', value: `${label(b.width, b.height)}${b.codec ? ' · ' + b.codec : ''}${b.bitrateKbps ? ' · ' + (b.bitrateKbps / 1000).toFixed(1) + ' Mbps' : ''}`, inline: true }
+        { name: '🎞️ Best quality', value: `${label(b.width, b.height)}${b.codec ? ' · ' + b.codec : ''}${b.fps ? ' · ' + b.fps + ' FPS' : ''}${b.bitrateKbps ? ' · ' + (b.bitrateKbps / 1000).toFixed(1) + ' Mbps' : ''}`, inline: true }
       ],
       footer: { text: 'FrameUp · frameup-pl.netlify.app' }
     }]
