@@ -1,6 +1,7 @@
 // FrameUp Discord bot: slash commands over HTTP (Discord Interactions).
 // Env vars (Netlify): DISCORD_PUBLIC_KEY, DISCORD_TOKEN.
 import { createPublicKey, verify } from 'node:crypto';
+import { rateStart, rateVote, rolesPost, roleToggle, settingsReply } from '../shared/features.mjs';
 
 const API = 'https://discord.com/api/v10';
 const ORANGE = 0xff4d1a;
@@ -116,7 +117,16 @@ export default async (req, context) => {
   const i = JSON.parse(body);
   if (i.type === 1) return new Response(JSON.stringify({ type: 1 }), { headers: { 'content-type': 'application/json' } });
   if (i.type === 5 && String(i.data.custom_id || '').startsWith('announce')) return announce(i);
+  if (i.type === 3) {
+    const cid = String(i.data.custom_id || '');
+    if (cid.startsWith('rate:')) return rateVote(i);
+    if (cid.startsWith('role:')) return roleToggle(i);
+    return secret('Unknown button.');
+  }
   if (i.type !== 2) return secret('Unsupported.');
+  if (i.data.name === 'rate' || i.data.name === 'Rate this edit') return rateStart(i);
+  if (i.data.name === 'settings') return settingsReply(i);
+  if (i.data.name === 'roles') return canManage(i) ? rolesPost(i) : secret('Only server managers can post the role picker.');
 
   if (i.data.name === 'announce') {
     if (!canManage(i)) return secret('Only server managers can post announcements.');
