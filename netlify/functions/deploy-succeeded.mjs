@@ -9,6 +9,13 @@ const user = { name: 'user', description: 'Member', type: 6, required: true };
 const reason = { name: 'reason', description: 'Reason (shown in the audit log)', type: 3, required: false, max_length: 300 };
 
 export const COMMANDS = [
+  { name: 'rate', description: 'Let people rate an edit 1-10', dm_permission: false,
+    options: [{ name: 'link', description: 'Link to the edit (TikTok, YouTube, Discord message...)', type: 3, required: true }] },
+  { name: 'Rate this edit', type: 3, dm_permission: false },
+  { name: 'roles', description: 'Post the editing app role picker here', default_member_permissions: String(1 << 5), dm_permission: false },
+  { name: 'settings', description: 'Best export settings for TikTok', dm_permission: false,
+    options: [{ name: 'app', description: 'Your editing app', type: 3, required: true, choices: [
+      { name: 'CapCut', value: 'capcut' }, { name: 'After Effects', value: 'ae' }, { name: 'Premiere Pro', value: 'premiere' }, { name: 'Alight Motion', value: 'alight' }] }] },
   { name: 'announce', description: 'Post an announcement in #announcements as FrameUp', default_member_permissions: String(1 << 5), dm_permission: false,
     options: [{ name: 'ping', description: 'Ping @everyone', type: 5, required: false }] },
   { name: 'check', description: 'Check a TikTok: views, likes and the quality TikTok serves', dm_permission: false,
