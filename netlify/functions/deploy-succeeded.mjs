@@ -1,6 +1,6 @@
 // Runs automatically after every successful Netlify deploy.
 // 1) Registers the bot's slash commands.  2) Posts an update in #announcements.
-// Env vars: DISCORD_TOKEN, DISCORD_APP_ID, DISCORD_ANNOUNCE_WEBHOOK.
+// Env vars: DISCORD_TOKEN, DISCORD_APP_ID, DISCORD_ANNOUNCE_CHANNEL (or DISCORD_ANNOUNCE_WEBHOOK).
 // Put [skip] in the commit message to deploy without an announcement.
 
 const API = 'https://discord.com/api/v10';
@@ -33,21 +33,19 @@ export const handler = async (event) => {
 
   const title = String(deploy.title || '').trim();
   const prod = !deploy.context || deploy.context === 'production';
-  if (DISCORD_ANNOUNCE_WEBHOOK && prod && !/\[skip\]/i.test(title)) {
+  const channel = process.env.DISCORD_ANNOUNCE_CHANNEL;
+  if ((DISCORD_ANNOUNCE_WEBHOOK || (channel && DISCORD_TOKEN)) && prod && !/\[skip\]/i.test(title)) {
     const site = deploy.ssl_url || deploy.url || process.env.URL || 'https://frameup-pl.netlify.app';
-    const r = await fetch(DISCORD_ANNOUNCE_WEBHOOK, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        username: 'FrameUp',
-        embeds: [{
-          color: 0xff4d1a,
-          title: '🚀 FrameUp just got an update',
-          description: (title ? `**${title.slice(0, 200)}**\n\n` : '') + `Try it now: ${site}`,
-          url: site,
-          timestamp: new Date().toISOString()
-        }]
-      })
-    });
+    const embeds = [{
+      color: 0xff4d1a,
+      title: '🚀 FrameUp just got an update',
+      description: (title ? `**${title.slice(0, 200)}**\n\n` : '') + `Try it now: ${site}`,
+      url: site,
+      timestamp: new Date().toISOString()
+    }];
+    const r = DISCORD_ANNOUNCE_WEBHOOK
+      ? await fetch(DISCORD_ANNOUNCE_WEBHOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'FrameUp', embeds }) })
+      : await fetch(`${API}/channels/${channel}/messages`, { method: 'POST', headers: { authorization: 'Bot ' + DISCORD_TOKEN, 'content-type': 'application/json' }, body: JSON.stringify({ embeds }) });
     out.push('announce ' + r.status);
   }
   return { statusCode: 200, body: out.join(', ') || 'nothing to do' };
