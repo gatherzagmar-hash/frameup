@@ -213,7 +213,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Archivo,syste
 <section id="up">
 <div class="wrap">
   <h1>The best TikTok quality method.</h1>
-  <p class="lead">Drop your edit and press one button. Settings are tuned for TikTok out of the box, but you can change them. Everything runs on your computer, nothing is uploaded to a server.</p>
+  <p class="lead">Drop your edit and press one button. You get 1080p 60 FPS, tuned for TikTok. No settings needed. Everything runs on your computer, nothing is uploaded to a server.</p>
 
   <div class="drop" id="drop">
     <input type="file" id="pick" accept="video/*,.mov,.mkv" aria-label="Choose a video">
@@ -237,7 +237,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Archivo,syste
 
   <p class="summary" id="summary"></p>
 
-  <details class="adv" id="adv">
+  <details class="adv" id="adv" hidden>
     <summary>Settings <span>best by default</span></summary>
     <div class="in">
       <h2>Resolution</h2>
@@ -458,7 +458,7 @@ const engineMsg = m => /NET/.test(m) ? 'Could not download the engine. Check you
 /* ================= ustawienia ================= */
 const BEST = { res: '1080', fps: '60', interp: 'blend', codec: 'h264', br: '20', sharp: 40, dn: 30, deband: true, hq: false, fast: false };
 let S = { ...BEST };
-try { const s = JSON.parse(localStorage.getItem('metoda-set-v2')); if (s) S = { ...BEST, ...s }; } catch (e) {}
+// one method for everyone: always the best settings (the settings panel is hidden)
 const radios = ['res', 'fps', 'interp', 'codec', 'br'];
 function syncUI() {
   radios.forEach(n => { const el = document.querySelector(`#up input[name=${n}][value="${S[n]}"]`); if (el) el.checked = true; });
@@ -472,7 +472,7 @@ function summary() {
   const isBest = JSON.stringify(S) === JSON.stringify(BEST);
   const res = { '1080': '1080p', '1440': '2K', '2160': '4K' }[S.res];
   const fps = S.fps === '0' ? 'original FPS' : S.fps + ' FPS (' + (S.interp === 'mci' ? 'Max' : 'Smooth') + ')';
-  $('summary').innerHTML = `<b>${isBest ? 'Best settings' : 'Your settings'}:</b> ${esc(res)} · ${esc(fps)} · ${S.codec === 'hevc' ? 'HEVC' : 'H.264'} up to ${esc(S.br)} Mbps · sharpening ${S.sharp} · denoise ${S.dn}${S.deband ? ' · anti-banding' : ''}${S.hq ? ' · precise encoding' : ''}${S.fast ? ' · <b>Fast mode</b>' : ''} · constant FPS · BT.709 · clean metadata`;
+  $('summary').innerHTML = '<b>Output:</b> 1080p · 60 FPS · H.264 High · up to 20 Mbps · TikTok-ready';
 }
 radios.forEach(n => document.querySelectorAll(`#up input[name=${n}]`).forEach(el => el.addEventListener('change', () => { S[n] = el.value; save(); })));
 $('sharp').addEventListener('input', e => { S.sharp = +e.target.value; $('o-sharp').textContent = S.sharp; save(); });
