@@ -54,13 +54,14 @@ export default async (req) => {
     quality: b.QualityType ?? null,
     codec: (b.CodecType || '').toLowerCase().includes('265') || (b.CodecType || '').toLowerCase().includes('hevc') ? 'HEVC' : (b.CodecType ? 'H.264' : null),
     bitrateKbps: b.Bitrate ? Math.round(Number(b.Bitrate) / 1000) : null,
+    fps: num(b.BitrateFPS) || num(b.FPS) || null,
     width: num(b.PlayAddr?.Width), height: num(b.PlayAddr?.Height),
     sizeMB: b.PlayAddr?.DataSize ? Math.round(Number(b.PlayAddr.DataSize) / 104857.6) / 10 : null
   })).filter(x => x.width && x.height);
 
   const best = variants.reduce((a, b) => (!a || Math.min(b.width, b.height) > Math.min(a.width, a.height) || (Math.min(b.width, b.height) === Math.min(a.width, a.height) && (b.bitrateKbps || 0) > (a.bitrateKbps || 0))) ? b : a, null);
   // FPS nie jest podawany wprost – próbujemy znaleźć go w nazwie wariantu albo polach wideo.
-  const fpsGuess = num(v.fps) || num(v.frameRate) || (() => { for (const x of variants) { const m = (x.name || '').match(/(\d{2,3})fps/i); if (m) return Number(m[1]); } return null; })();
+  const fpsGuess = (best && best.fps) || num(v.fps) || num(v.frameRate) || variants.reduce((m, x) => Math.max(m, x.fps || 0), 0) || null;
 
   return json(200, {
     id: item.id,
