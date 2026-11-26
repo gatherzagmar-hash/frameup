@@ -248,8 +248,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Archivo,syste
       </div>
       <h2>Frame rate</h2>
       <div class="opts">
-        <div class="opt"><input type="radio" name="fps" id="f0" value="0"><label for="f0"><strong>Original</strong><span>no fake frames</span><em>recommended</em></label></div>
-        <div class="opt"><input type="radio" name="fps" id="f60" value="60"><label for="f60"><strong>60 FPS</strong><span>generates frames</span></label></div>
+        <div class="opt"><input type="radio" name="fps" id="f0" value="0"><label for="f0"><strong>Original</strong><span>no fake frames, plays smoothest on weak phones</span></label></div>
+        <div class="opt"><input type="radio" name="fps" id="f60" value="60"><label for="f60"><strong>60 FPS</strong><span>smoother on TikTok</span><em>recommended</em></label></div>
         <div class="opt"><input type="radio" name="fps" id="f120" value="120"><label for="f120"><strong>120 FPS</strong><span>very slow</span></label></div>
       </div>
       <h2>Frame interpolation</h2>
@@ -456,9 +456,9 @@ const engineMsg = m => /NET/.test(m) ? 'Could not download the engine. Check you
   : /LOADFAIL/.test(m) ? 'The engine did not start (' + m.replace('LOADFAIL: ', '') + '). Refresh the page and try Chrome or Edge.' : null;
 
 /* ================= ustawienia ================= */
-const BEST = { res: '1080', fps: '0', interp: 'blend', codec: 'h264', br: '20', sharp: 40, dn: 30, deband: true, hq: false, fast: false };
+const BEST = { res: '1080', fps: '60', interp: 'blend', codec: 'h264', br: '20', sharp: 40, dn: 30, deband: true, hq: false, fast: false };
 let S = { ...BEST };
-try { const s = JSON.parse(localStorage.getItem('metoda-set')); if (s) S = { ...BEST, ...s }; } catch (e) {}
+try { const s = JSON.parse(localStorage.getItem('metoda-set-v2')); if (s) S = { ...BEST, ...s }; } catch (e) {}
 const radios = ['res', 'fps', 'interp', 'codec', 'br'];
 function syncUI() {
   radios.forEach(n => { const el = document.querySelector(`#up input[name=${n}][value="${S[n]}"]`); if (el) el.checked = true; });
@@ -467,7 +467,7 @@ function syncUI() {
   $('deband').checked = S.deband; $('hq').checked = S.hq; $('fastm').checked = S.fast;
   summary();
 }
-function save() { try { localStorage.setItem('metoda-set', JSON.stringify(S)); } catch (e) {} summary(); }
+function save() { try { localStorage.setItem('metoda-set-v2', JSON.stringify(S)); } catch (e) {} summary(); }
 function summary() {
   const isBest = JSON.stringify(S) === JSON.stringify(BEST);
   const res = { '1080': '1080p', '1440': '2K', '2160': '4K' }[S.res];
