@@ -88,6 +88,26 @@ async function moderate(i) {
   return secret('Unknown command.');
 }
 
+const canManage = i => { try { return (BigInt(i.member?.permissions || 0) & 0x28n) !== 0n; } catch { return false; } }; // MANAGE_GUILD or ADMINISTRATOR
+
+async function announce(i) {
+  if (!canManage(i)) return secret('Only server managers can post announcements.');
+  const channel = process.env.DISCORD_ANNOUNCE_CHANNEL;
+  if (!channel) return secret('Announcements channel is not set up.');
+  const val = id => { for (const row of i.data.components || []) for (const c of row.components || []) if (c.custom_id === id) return String(c.value || '').trim(); return ''; };
+  const title = val('title'), body = val('body'), image = val('image');
+  const ping = String(i.data.custom_id).endsWith(':1');
+  const embed = { color: ORANGE, description: body, footer: { text: 'FrameUp · frameup-pl.netlify.app' }, timestamp: new Date().toISOString() };
+  if (title) embed.title = title;
+  if (/^https:\/\/\S+$/i.test(image)) embed.image = { url: image };
+  try {
+    await discord(`/channels/${channel}/messages`, 'POST', { content: ping ? '@everyone' : undefined, embeds: [embed], allowed_mentions: { parse: ping ? ['everyone'] : [] } });
+    return secret(`✅ Posted in <#${channel}>.`);
+  } catch (e) {
+    return secret(/^403/.test(String(e.message)) ? "❌ I can't post there. Give the FrameUp role Send Messages (and Mention Everyone for pings) in #announcements." : '❌ Discord error: ' + e.message);
+  }
+}
+
 export default async (req, context) => {
   if (req.method !== 'POST') return new Response('FrameUp bot is online.', { status: 200 });
   const body = await req.text();
@@ -95,7 +115,18 @@ export default async (req, context) => {
   if (!process.env.DISCORD_PUBLIC_KEY || !validSignature(body, sig, ts, process.env.DISCORD_PUBLIC_KEY)) return new Response('bad signature', { status: 401 });
   const i = JSON.parse(body);
   if (i.type === 1) return new Response(JSON.stringify({ type: 1 }), { headers: { 'content-type': 'application/json' } });
+  if (i.type === 5 && String(i.data.custom_id || '').startsWith('announce')) return announce(i);
   if (i.type !== 2) return secret('Unsupported.');
+
+  if (i.data.name === 'announce') {
+    if (!canManage(i)) return secret('Only server managers can post announcements.');
+    const ping = opt(i, 'ping') ? 1 : 0;
+    const field = (id, label, style, max, required) => ({ type: 1, components: [{ type: 4, custom_id: id, label, style, max_length: max, required }] });
+    return new Response(JSON.stringify({ type: 9, data: {
+      custom_id: 'announce:' + ping, title: 'New announcement',
+      components: [field('title', 'Title (optional)', 1, 200, false), field('body', 'Message', 2, 3800, true), field('image', 'Image link (optional)', 1, 500, false)]
+    } }), { headers: { 'content-type': 'application/json' } });
+  }
 
   if (i.data.name === 'check') {
     const url = String(opt(i, 'link') || '').trim();
