@@ -33,6 +33,19 @@ export const handler = async (event) => {
     out.push('commands ' + r.status);
   }
 
+  if (DISCORD_TOKEN) {
+    // Give the bot the FrameUp logo as its profile picture (only if it has none yet).
+    try {
+      const auth = { authorization: 'Bot ' + DISCORD_TOKEN, 'content-type': 'application/json' };
+      const me = await (await fetch(`${API}/users/@me`, { headers: auth })).json();
+      if (me && me.id && !me.avatar) {
+        const html = await (await fetch(process.env.URL || 'https://frameup-pl.netlify.app')).text();
+        const icon = (html.match(/rel="apple-touch-icon" href="(data:image\/png;base64,[^"]+)"/) || [])[1];
+        if (icon) out.push('avatar ' + (await fetch(`${API}/users/@me`, { method: 'PATCH', headers: auth, body: JSON.stringify({ avatar: icon }) })).status);
+      }
+    } catch { out.push('avatar failed'); }
+  }
+
   const title = String(deploy.title || '').trim();
   const prod = !deploy.context || deploy.context === 'production';
   const channel = process.env.DISCORD_ANNOUNCE_CHANNEL;
