@@ -274,6 +274,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Archivo,syste
         <div class="sld"><label for="sharp">Sharpening</label><output id="o-sharp"></output><input type="range" id="sharp" min="0" max="100" step="5"></div>
         <div class="sld"><label for="dn">Denoise</label><output id="o-dn"></output><input type="range" id="dn" min="0" max="100" step="5"></div>
       </div>
+      <div class="row"><input type="checkbox" id="fastm"><label for="fastm"><b>Fast mode</b> (about 2× faster: quick encoding, no denoise or anti-banding, slightly lower quality)</label></div>
       <div class="row"><input type="checkbox" id="hq"><label for="hq">Most precise encoding (2–3× slower, the difference after TikTok upload is minimal)</label></div>
       <div class="row"><input type="checkbox" id="deband"><label for="deband">Anti-banding (removes “steps” in gradients, e.g. skies and dark scenes)</label></div>
       <button class="resetb" id="resetb">Restore best settings</button>
@@ -455,7 +456,7 @@ const engineMsg = m => /NET/.test(m) ? 'Could not download the engine. Check you
   : /LOADFAIL/.test(m) ? 'The engine did not start (' + m.replace('LOADFAIL: ', '') + '). Refresh the page and try Chrome or Edge.' : null;
 
 /* ================= ustawienia ================= */
-const BEST = { res: '1080', fps: '0', interp: 'blend', codec: 'h264', br: '20', sharp: 40, dn: 30, deband: true, hq: false };
+const BEST = { res: '1080', fps: '0', interp: 'blend', codec: 'h264', br: '20', sharp: 40, dn: 30, deband: true, hq: false, fast: false };
 let S = { ...BEST };
 try { const s = JSON.parse(localStorage.getItem('metoda-set')); if (s) S = { ...BEST, ...s }; } catch (e) {}
 const radios = ['res', 'fps', 'interp', 'codec', 'br'];
@@ -463,7 +464,7 @@ function syncUI() {
   radios.forEach(n => { const el = document.querySelector(`#up input[name=${n}][value="${S[n]}"]`); if (el) el.checked = true; });
   $('sharp').value = S.sharp; $('o-sharp').textContent = S.sharp;
   $('dn').value = S.dn; $('o-dn').textContent = S.dn;
-  $('deband').checked = S.deband; $('hq').checked = S.hq;
+  $('deband').checked = S.deband; $('hq').checked = S.hq; $('fastm').checked = S.fast;
   summary();
 }
 function save() { try { localStorage.setItem('metoda-set', JSON.stringify(S)); } catch (e) {} summary(); }
@@ -471,13 +472,14 @@ function summary() {
   const isBest = JSON.stringify(S) === JSON.stringify(BEST);
   const res = { '1080': '1080p', '1440': '2K', '2160': '4K' }[S.res];
   const fps = S.fps === '0' ? 'original FPS' : S.fps + ' FPS (' + (S.interp === 'mci' ? 'Max' : 'Smooth') + ')';
-  $('summary').innerHTML = `<b>${isBest ? 'Best settings' : 'Your settings'}:</b> ${esc(res)} · ${esc(fps)} · ${S.codec === 'hevc' ? 'HEVC' : 'H.264'} up to ${esc(S.br)} Mbps · sharpening ${S.sharp} · denoise ${S.dn}${S.deband ? ' · anti-banding' : ''}${S.hq ? ' · precise encoding' : ''} · constant FPS · BT.709 · clean metadata`;
+  $('summary').innerHTML = `<b>${isBest ? 'Best settings' : 'Your settings'}:</b> ${esc(res)} · ${esc(fps)} · ${S.codec === 'hevc' ? 'HEVC' : 'H.264'} up to ${esc(S.br)} Mbps · sharpening ${S.sharp} · denoise ${S.dn}${S.deband ? ' · anti-banding' : ''}${S.hq ? ' · precise encoding' : ''}${S.fast ? ' · <b>Fast mode</b>' : ''} · constant FPS · BT.709 · clean metadata`;
 }
 radios.forEach(n => document.querySelectorAll(`#up input[name=${n}]`).forEach(el => el.addEventListener('change', () => { S[n] = el.value; save(); })));
 $('sharp').addEventListener('input', e => { S.sharp = +e.target.value; $('o-sharp').textContent = S.sharp; save(); });
 $('dn').addEventListener('input', e => { S.dn = +e.target.value; $('o-dn').textContent = S.dn; save(); });
 $('deband').addEventListener('change', e => { S.deband = e.target.checked; save(); });
-$('hq').addEventListener('change', e => { S.hq = e.target.checked; save(); });
+$('hq').addEventListener('change', e => { S.hq = e.target.checked; if (S.hq) { S.fast = false; $('fastm').checked = false; } save(); });
+$('fastm').addEventListener('change', e => { S.fast = e.target.checked; if (S.fast) { S.hq = false; $('hq').checked = false; } save(); });
 $('resetb').addEventListener('click', () => { S = { ...BEST }; save(); syncUI(); });
 
 /* ================= stan, log, postęp ================= */
@@ -580,17 +582,17 @@ function buildArgs(inName, p) {
   const short = +S.res, sh = Math.min(info.w, info.h);
   let size = [info.w, info.h], scaleF = null;
   if (sh && sh !== short) { const k = short / sh; size = [even(info.w * k), even(info.h * k)]; scaleF = `scale=${size[0]}:${size[1]}:flags=lanczos`; }
-  const l = S.dn / 100 * 5, dnF = S.dn > 0 ? `hqdn3d=${l.toFixed(2)}:${(l * .75).toFixed(2)}:${(l * 4).toFixed(2)}:${(l * 3).toFixed(2)}` : null;
+  const l = S.dn / 100 * 5, dnF = S.dn > 0 && !S.fast ? `hqdn3d=${l.toFixed(2)}:${(l * .75).toFixed(2)}:${(l * 4).toFixed(2)}:${(l * 3).toFixed(2)}` : null;
   // szybkość: ciężkie filtry liczymy na mniejszym obrazie
   const down = scaleF && short < sh;
   const vf = (down ? [scaleF, dnF, fpsF] : [dnF, fpsF, scaleF]).filter(Boolean);
-  if (S.deband) vf.push('gradfun=1.2:16');
+  if (S.deband && !S.fast) vf.push('gradfun=1.2:16');
   if (S.sharp > 0) vf.push(`unsharp=5:5:${(S.sharp / 100 * 1.25).toFixed(2)}:5:5:0`);
   vf.push('format=yuv420p');
   const br = +S.br, heavy = short > 1080 || outFps > 60;
   const venc = S.codec === 'hevc'
-    ? ['-c:v', 'libx265', '-preset', S.hq ? 'fast' : (heavy ? 'ultrafast' : 'superfast'), '-crf', '19', '-tag:v', 'hvc1', '-x265-params', 'log-level=error']
-    : ['-c:v', 'libx264', '-preset', S.hq ? 'medium' : (heavy ? 'superfast' : 'veryfast'), '-profile:v', 'high', '-crf', '17'];
+    ? ['-c:v', 'libx265', '-preset', S.hq ? 'fast' : (heavy || S.fast ? 'ultrafast' : 'superfast'), '-crf', '19', '-tag:v', 'hvc1', '-x265-params', 'log-level=error']
+    : ['-c:v', 'libx264', '-preset', S.hq ? 'medium' : (S.fast ? 'ultrafast' : heavy ? 'superfast' : 'veryfast'), '-profile:v', 'high', '-crf', '17'];
   const args = ['-hide_banner', '-i', inName, '-map', '0:v:0', '-map', '0:a:0?', '-vf', vf.join(','), '-fps_mode', 'cfr', '-r', String(outFps),
     ...venc, '-maxrate', br + 'M', '-bufsize', br * 2 + 'M', '-g', String(outFps * 2),
     '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709',
@@ -864,7 +866,10 @@ if (cfg.apiKey && !/PASTE/.test(cfg.apiKey)) {
     setInterval(() => { if (window.FU.user && window.FU.points != null) window.FU.loadPoints(); }, 300000);
     window.FU.signIn = async () => { try { await signInWithPopup(auth, provider); } catch (e) { if (!/popup-closed|cancelled-popup/.test(e.code || '')) toast('Sign-in failed: ' + (e.code || e.message)); } };
     window.FU.signOut = () => signOut(auth).catch(() => {});
-    onAuthStateChanged(auth, async u => { window.FU.user = u ? { name: u.displayName, email: u.email, photo: u.photoURL, uid: u.uid } : null; window.FU.points = null; emit(); if (u) { await window.FU.loadPoints(); emit(); } });
+    onAuthStateChanged(auth, async u => {
+      window.FU.user = u ? { name: u.displayName, email: u.email, photo: u.photoURL, uid: u.uid } : null; window.FU.points = null;
+      emit(); if (u) { await window.FU.loadPoints(); emit(); }
+    });
   } catch (e) { toast('Could not load Google login.'); emit(); }
 } else emit();
 </script>
