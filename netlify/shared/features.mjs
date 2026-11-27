@@ -33,7 +33,7 @@ export function rateStart(i) {
   }
   return json({ type: 4, data: {
     content: `🎬 Rate ${who}'s edit! ${link}`,
-    embeds: [{ color: ORANGE, title: 'Rate this edit 1–10', description: 'Click a number below. You can change your vote anytime.', fields: [{ name: '⭐ Score', value: scoreText(0, 0) }], footer: { text: 'FrameUp · frameup-pl.netlify.app' } }],
+    embeds: [{ color: ORANGE, title: 'Rate this edit 1–10', description: 'Click a number below. You can change your vote anytime.', fields: [{ name: '⭐ Score', value: scoreText(0, 0) }], footer: { text: 'FrameUp · frameupmethod.github.io' } }],
     components: rateButtons(),
     allowed_mentions: { parse: [] }
   } });
@@ -103,7 +103,7 @@ export async function roleToggle(i) {
 }
 
 /* ---------- 2. Export settings ---------- */
-const TIP = 'Then run the file through the **FrameUp Method** (frameup-pl.netlify.app) and upload from a computer with Upload HD on.';
+const TIP = 'Then run the file through the **FrameUp Method** (frameupmethod.github.io) and upload from a computer with Upload HD on.';
 export const SETTINGS = {
   capcut: { title: 'CapCut → TikTok', lines: ['**Resolution:** 1080p (2K/4K only if your clips are that sharp)', '**Frame rate:** same as your project (30 or 60)', '**Bitrate / Code rate:** Higher, or Custom at the max', '**Format:** MP4', '**Smart HDR:** off', '**Optical flow / slow-mo:** render it in the project, not on export'] },
   ae: { title: 'After Effects → TikTok', lines: ['Export with **Media Encoder** (File → Export → Add to Media Encoder Queue)', '**Format:** H.264 · **Preset:** Match Source – High bitrate', '**Size:** 1080×1920 · **Frame rate:** same as comp', '**Bitrate:** VBR 2 pass · Target 30 Mbps · Max 50 Mbps', '**Render at Maximum Depth** + **Use Maximum Render Quality**: on', '**Audio:** AAC · 48 kHz · 320 kbps'] },
