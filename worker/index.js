@@ -28,6 +28,11 @@ export const COMMANDS = [
   { name: 'settings', description: 'Best export settings for TikTok', dm_permission: false,
     options: [{ name: 'app', description: 'Your editing app', type: 3, required: true, choices: [
       { name: 'CapCut', value: 'capcut' }, { name: 'After Effects', value: 'ae' }, { name: 'Premiere Pro', value: 'premiere' }, { name: 'Alight Motion', value: 'alight' }] }] },
+  { name: 'tiktok', description: 'TikTok profile stats: followers, likes, videos', dm_permission: false,
+    options: [{ name: 'user', description: 'TikTok username, e.g. @frameup', type: 3, required: true, max_length: 60 }] },
+  { name: 'suggest', description: 'Send an idea for the server or the website', dm_permission: false,
+    options: [{ name: 'idea', description: 'Your idea', type: 3, required: true, max_length: 1000 }] },
+  { name: 'suggest-channel', description: 'Make this channel the one where /suggest ideas are posted', default_member_permissions: MANAGE, dm_permission: false },
   { name: 'roles', description: 'Post the editing app role picker here', default_member_permissions: MANAGE, dm_permission: false },
   { name: 'announce', description: 'Post an announcement in #announcements as FrameUp', default_member_permissions: MANAGE, dm_permission: false,
     options: [{ name: 'ping', description: 'Ping @everyone', type: 5, required: false }] },
@@ -137,6 +142,79 @@ async function checkEmbed(url) {
       { name: '🔖 Saves', value: short(d.stats?.saves), inline: true },
       { name: '🎞️ Best quality', value: `${label(b.width, b.height)}${b.codec ? ' · ' + b.codec : ''}${b.fps ? ' · ' + b.fps + ' FPS' : ''}${b.bitrateKbps ? ' · ' + (b.bitrateKbps / 1000).toFixed(1) + ' Mbps' : ''}`, inline: true }
     ], footer: FOOT }] };
+}
+
+/* ---------------- TikTok profile ---------------- */
+async function tiktokProfile(raw) {
+  const name = String(raw || '').trim().replace(/^https?:\/\/(www\.)?tiktok\.com\//i, '').replace(/^@/, '').split(/[/?#\s]/)[0];
+  if (!/^[A-Za-z0-9._]{2,24}$/.test(name)) return { status: 400, body: { error: 'Type a TikTok username, e.g. @frameup' } };
+  let res;
+  try { res = await fetch('https://www.tiktok.com/@' + name, { headers: { 'user-agent': UA, 'accept-language': 'en-US,en;q=0.9', accept: 'text/html' } }); }
+  catch { return { status: 502, body: { error: 'Could not reach TikTok. Try again in a moment.' } }; }
+  if (!res.ok) return { status: 502, body: { error: `TikTok answered with an error (${res.status}). Try again later.` } };
+  const html = await res.text();
+  const uni = pickScript(html, '__UNIVERSAL_DATA_FOR_REHYDRATION__');
+  const info = uni?.__DEFAULT_SCOPE__?.['webapp.user-detail']?.userInfo;
+  const u = info?.user, st = info?.statsV2 || info?.stats;
+  if (!u || !st) return { status: 404, body: { error: `Profile @${name} not found (or TikTok blocked the check).` } };
+  return { status: 200, body: {
+    username: u.uniqueId, name: u.nickname || '', bio: u.signature || '', avatar: u.avatarLarger || u.avatarMedium || u.avatarThumb || null,
+    verified: !!u.verified, private: !!u.privateAccount, url: 'https://www.tiktok.com/@' + u.uniqueId,
+    stats: { followers: num(st.followerCount), following: num(st.followingCount), likes: num(st.heartCount ?? st.heart), videos: num(st.videoCount) }
+  } };
+}
+async function profileEmbed(user) {
+  const { status, body: d } = await tiktokProfile(user);
+  if (status !== 200) return { content: '❌ ' + (d.error || 'Check failed.') };
+  return { embeds: [{
+    color: ORANGE, title: `${d.name || d.username}${d.verified ? ' ✔️' : ''}`, url: d.url, author: { name: '@' + d.username, url: d.url },
+    thumbnail: d.avatar ? { url: d.avatar } : undefined, description: (d.private ? '🔒 Private account\n' : '') + (d.bio || '').slice(0, 300),
+    fields: [
+      { name: '👥 Followers', value: short(d.stats.followers), inline: true },
+      { name: '❤️ Likes', value: short(d.stats.likes), inline: true },
+      { name: '🎬 Videos', value: short(d.stats.videos), inline: true },
+      { name: '➡️ Following', value: short(d.stats.following), inline: true }
+    ], footer: FOOT }] };
+}
+
+/* ---------------- suggestions ---------------- */
+const suggestButtons = (up, down) => [{ type: 1, components: [
+  { type: 2, style: 3, label: String(up), emoji: { name: '👍' }, custom_id: 'sug:up' },
+  { type: 2, style: 4, label: String(down), emoji: { name: '👎' }, custom_id: 'sug:down' }] }];
+async function suggestPost(i, env) {
+  const idea = String(opt(i, 'idea') || '').trim();
+  if (!idea) return secret('Write your idea.');
+  let channel = null;
+  try { channel = await env.VOTES.get('suggest-channel:' + i.guild_id); } catch {}
+  if (!channel) return secret('Suggestions are not set up yet. A server manager has to run **/suggest-channel** in the channel where ideas should go.');
+  const by = i.member?.user || {};
+  try {
+    await bot(env)(`/channels/${channel}/messages`, 'POST', {
+      embeds: [{ color: ORANGE, author: { name: (by.global_name || by.username || 'Someone') + ' suggests:', icon_url: by.avatar ? `https://cdn.discordapp.com/avatars/${by.id}/${by.avatar}.png` : undefined },
+        description: idea, footer: { text: 'Vote with the buttons · /suggest to send your own' }, timestamp: new Date().toISOString() }],
+      components: suggestButtons(0, 0), allowed_mentions: { parse: [] } });
+    return secret(`✅ Thanks! Your idea was posted in <#${channel}>.`);
+  } catch (e) {
+    return secret(/^403/.test(String(e.message)) ? "❌ I can't post in the suggestions channel. Give the FrameUp role View Channel + Send Messages there." : '❌ Discord error: ' + e.message);
+  }
+}
+async function suggestSetChannel(i, env) {
+  if (!canManage(i)) return secret('Only server managers can do this.');
+  try { await env.VOTES.put('suggest-channel:' + i.guild_id, i.channel_id || i.channel?.id); } catch { return secret('❌ Could not save. Try again.'); }
+  return secret(`✅ /suggest ideas will now be posted in <#${i.channel_id || i.channel?.id}>. Make sure I can send messages here.`);
+}
+async function suggestVote(i, env) {
+  const uid = i.member?.user?.id || i.user?.id, dir = String(i.data.custom_id).split(':')[1];
+  if (!uid || !['up', 'down'].includes(dir)) return secret('Invalid vote.');
+  const key = 'sug:' + i.message.id;
+  let votes = {};
+  try {
+    votes = (await env.VOTES.get(key, 'json')) || {};
+    if (votes[uid] === dir) delete votes[uid]; else votes[uid] = dir;
+    await env.VOTES.put(key, JSON.stringify(votes), { expirationTtl: 60 * 60 * 24 * 180 });
+  } catch { return secret('❌ Could not save your vote. Try again in a moment.'); }
+  const vals = Object.values(votes);
+  return json({ type: 7, data: { embeds: i.message.embeds, components: suggestButtons(vals.filter(v => v === 'up').length, vals.filter(v => v === 'down').length) } });
 }
 
 /* ---------------- edit rating ---------------- */
@@ -283,6 +361,7 @@ async function interaction(i, env, ctx) {
     const cid = String(i.data.custom_id || '');
     if (cid.startsWith('rate:')) return rateVote(i, env);
     if (cid.startsWith('role:')) return roleToggle(i, env);
+    if (cid.startsWith('sug:')) return suggestVote(i, env);
     return secret('Unknown button.');
   }
   if (i.type === 5 && String(i.data.custom_id || '').startsWith('announce')) return announceSubmit(i, env);
@@ -294,6 +373,17 @@ async function interaction(i, env, ctx) {
     components: [{ type: 1, components: [{ type: 2, style: 5, label: 'Open FrameUp', url: SITE }] }] });
   if (name === 'rate' || name === 'Rate this edit') return rateStart(i);
   if (name === 'settings') return settingsReply(i);
+  if (name === 'suggest') return suggestPost(i, env);
+  if (name === 'suggest-channel') return suggestSetChannel(i, env);
+  if (name === 'tiktok') {
+    const user = opt(i, 'user');
+    ctx.waitUntil((async () => {
+      let data;
+      try { data = await profileEmbed(user); } catch { data = { content: '❌ Check failed. Try again in a moment.' }; }
+      await fetch(`${API}/webhooks/${i.application_id}/${i.token}/messages/@original`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
+    })());
+    return reply({}, 5);
+  }
   if (name === 'roles') return canManage(i) ? rolesPost(i, env) : secret('Only server managers can post the role picker.');
   if (name === 'announce') return announceModal(i);
   if (name === 'check') {
@@ -316,6 +406,10 @@ export default {
       const cors = { 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=300' };
       const { status, body } = await tiktokCheck(url.searchParams.get('url') || '');
       return json(body, status, cors);
+    }
+    if (url.pathname === '/api/profile') {
+      const { status, body } = await tiktokProfile(url.searchParams.get('user') || '');
+      return json(body, status, { 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=300' });
     }
     if (url.pathname === '/register') {
       if (!env.DISCORD_TOKEN || !env.DISCORD_APP_ID) return json({ error: 'missing DISCORD_TOKEN or DISCORD_APP_ID' }, 500);
