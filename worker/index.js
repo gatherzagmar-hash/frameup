@@ -206,7 +206,10 @@ async function suggestIntro(env, gid) {
 }
 async function suggestSetChannel(i, env) {
   if (!canManage(i)) return secret('Only server managers can do this.');
-  const ch = i.channel_id || i.channel?.id, gid = i.guild_id, call = bot(env);
+  const gid = i.guild_id, call = bot(env);
+  let ch = i.channel_id || i.channel?.id;
+  // if the server has a #suggestions channel, ideas always go there, wherever this command is typed
+  try { const sc = (await call(`/guilds/${gid}/channels`)).find(c => c.type === 0 && /suggestion/i.test(c.name)); if (sc) ch = sc.id; } catch {}
   try { await env.VOTES.put('suggest-channel:' + gid, ch); } catch { return secret('❌ Could not save. Try again.'); }
   // refresh the info message in this channel: edit the old one if it is there, otherwise post a new one
   let note = '';
