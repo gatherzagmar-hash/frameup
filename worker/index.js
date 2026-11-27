@@ -199,10 +199,24 @@ async function suggestPost(i, env) {
     return secret(/^403/.test(String(e.message)) ? "❌ I can't post in the suggestions channel. Give the FrameUp role View Channel + Send Messages there." : '❌ Discord error: ' + e.message);
   }
 }
+async function suggestIntro(env, gid) {
+  let where = '**#commands**';
+  try { const cmd = (await bot(env)(`/guilds/${gid}/channels`)).find(c => c.type === 0 && c.name.toLowerCase().includes('command')); if (cmd) where = `<#${cmd.id}>`; } catch {}
+  return intro('💡 Suggestions', `Got an idea for the server or the website?\nGo to ${where} and type **/suggest** with your idea.\n\nIt shows up here and everyone can vote 👍 or 👎.`);
+}
 async function suggestSetChannel(i, env) {
   if (!canManage(i)) return secret('Only server managers can do this.');
-  try { await env.VOTES.put('suggest-channel:' + i.guild_id, i.channel_id || i.channel?.id); } catch { return secret('❌ Could not save. Try again.'); }
-  return secret(`✅ /suggest ideas will now be posted in <#${i.channel_id || i.channel?.id}>. Make sure I can send messages here.`);
+  const ch = i.channel_id || i.channel?.id, gid = i.guild_id, call = bot(env);
+  try { await env.VOTES.put('suggest-channel:' + gid, ch); } catch { return secret('❌ Could not save. Try again.'); }
+  // refresh the info message in this channel: edit the old one if it is there, otherwise post a new one
+  let note = '';
+  try {
+    const msg = await suggestIntro(env, gid);
+    const old = (await call(`/channels/${ch}/messages?limit=50`)).find(m => m.author?.id === env.DISCORD_APP_ID && (m.embeds || []).some(e => /Suggestions/.test(e.title || '')));
+    if (old) { await call(`/channels/${ch}/messages/${old.id}`, 'PATCH', msg); note = ' Updated the info message.'; }
+    else { await call(`/channels/${ch}/messages`, 'POST', { ...msg, allowed_mentions: { parse: [] } }); note = ' Posted the info message.'; }
+  } catch {}
+  return secret(`✅ /suggest ideas will now be posted in <#${ch}>.${note}`);
 }
 async function suggestVote(i, env) {
   const uid = i.member?.user?.id || i.user?.id, dir = String(i.data.custom_id).split(':')[1];
@@ -331,7 +345,7 @@ const LAYOUT = [
     { name: 'website', readOnly: true, topic: 'frameupmethod.github.io', post: () => [websiteMessage()] },
     { name: 'roles', readOnly: true, topic: 'Pick your editing app', post: async (env, gid) => [await rolePickerMessage(env, gid)] },
     { name: 'suggestions', readOnly: true, topic: 'Ideas for the server and website. Use /suggest', suggest: true,
-      post: () => [intro('💡 Suggestions', 'Got an idea for the server or the website?\nType **/suggest** and write it. Your idea shows up here and everyone can vote 👍 or 👎.')] }
+      post: async (env, gid) => [await suggestIntro(env, gid)] }
   ] },
   { category: '🎬 EDITS', channels: [
     { name: 'edit-rate', topic: 'Post your edits and let people rate them 1-10. Use /rate', post: () => [intro('⭐ Edit rate',
