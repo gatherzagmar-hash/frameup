@@ -577,9 +577,12 @@ function buildArgs(inName, p) {
   const sf = p.fps || info.fps || 30;
   let outFps = Math.round(sf), fpsF = null;
   const tf = +S.fps;
+  let hybrid = false;
   if (tf && sf < tf - 0.5) {
-    // real in-between frames (motion analysis), so 30 FPS edits really move like 60 instead of blended ghost frames
-    fpsF = S.fast ? `minterpolate=fps=${tf}:mi_mode=blend:scd=fdiff:scd_threshold=8` : `minterpolate=fps=${tf}:mi_mode=mci:mc_mode=obmc:me_mode=bilat:me=epzs:mb_size=16:search_param=16:vsbmc=0:scd=fdiff:scd_threshold=8`;
+    // 30 -> 60: keep every original frame sharp and add real motion-interpolated frames in between
+    // (motion is computed on a small copy so it stays fast in the browser). Other rates fall back to blending.
+    hybrid = !S.fast && tf === 60 && sf > 29 && sf < 31;
+    fpsF = hybrid ? 'HYBRID' : `minterpolate=fps=${tf}:mi_mode=blend:scd=fdiff:scd_threshold=8`;
     outFps = tf;
   } else if (tf && sf > tf + 0.5) { fpsF = `fps=${tf}`; outFps = tf; }
   else if (!tf && sf > 60.5) { fpsF = 'fps=60'; outFps = 60; }
@@ -589,6 +592,11 @@ function buildArgs(inName, p) {
   const l = S.dn / 100 * 5, dnF = S.dn > 0 && !S.fast ? `hqdn3d=${l.toFixed(2)}:${(l * .75).toFixed(2)}:${(l * 4).toFixed(2)}:${(l * 3).toFixed(2)}` : null;
   // szybkość: ciężkie filtry liczymy na mniejszym obrazie
   const down = scaleF && short < sh;
+  if (hybrid) {
+    const [fw, fh] = down ? size : [info.w, info.h], fs = Math.min(fw, fh), k = Math.min(1, 540 / fs);
+    const lw = even(fw * k), lh = even(fh * k);
+    fpsF = `fps=30,split[o][l];[l]scale=${lw}:${lh},minterpolate=fps=60:mi_mode=mci:mc_mode=obmc:me_mode=bilat:me=epzs:mb_size=16:search_param=16:vsbmc=0:scd=fdiff:scd_threshold=8,select='mod(n\\,2)',scale=${fw}:${fh}:flags=bicubic[m];[o][m]interleave`;
+  }
   const vf = (down ? [scaleF, dnF, fpsF] : [dnF, fpsF, scaleF]).filter(Boolean);
   if (S.deband && !S.fast) vf.push('gradfun=1.2:16');
   if (S.sharp > 0) vf.push(`unsharp=5:5:${(S.sharp / 100 * 1.25).toFixed(2)}:5:5:0`);
