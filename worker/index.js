@@ -33,6 +33,7 @@ export const COMMANDS = [
   { name: 'suggest', description: 'Send an idea for the server or the website', dm_permission: false,
     options: [{ name: 'idea', description: 'Your idea', type: 3, required: true, max_length: 1000 }] },
   { name: 'suggest-channel', description: 'Make this channel the one where /suggest ideas are posted', default_member_permissions: MANAGE, dm_permission: false },
+  { name: 'post-rules', description: 'Post the server rules in #rules', default_member_permissions: MANAGE, dm_permission: false },
   { name: 'post-website', description: 'Post the website link + banner in #website', default_member_permissions: MANAGE, dm_permission: false },
   { name: 'setup', description: 'Create the FrameUp channels (INFO + EDITS). Safe to run again.', default_member_permissions: MANAGE, dm_permission: false },
   { name: 'roles', description: 'Post the editing app role picker here', default_member_permissions: MANAGE, dm_permission: false },
@@ -333,6 +334,25 @@ const websiteMessage = () => ({
     description: 'Drop your edit, press one button, get **1080p 60 FPS** tuned for TikTok. Free, runs in your browser.\n\nAlso check any TikTok: views, likes and the quality TikTok serves.\n\n🔗 **' + SITE + '**',
     image: { url: SITE + 'banner.webp' }, footer: { text: 'frameupmethod.github.io' } }],
   components: [{ type: 1, components: [{ type: 2, style: 5, label: 'Open FrameUp', url: SITE }, { type: 2, style: 5, label: 'All links', url: SITE + 'links/' }] }] });
+const rulesMessage = () => ({ embeds: [
+  { color: ORANGE, title: '📜 FrameUp – Server Rules', description: 'Welcome to **FrameUp**! Read the rules below. By staying on the server you agree to follow them.\n\n' + RULES.map((r, k) => `**${k + 1}.** ${r}`).join('\n\n'), footer: FOOT },
+  { color: 0x2b2d31, title: '⚖️ Punishments', description: '• 1st time: warning\n• 2nd time: timeout\n• 3rd time: kick\n• Serious stuff (hate, NSFW, scams, raids): instant ban\n\nMods can decide differently depending on the situation.' },
+  { color: 0x2b2d31, title: '📌 Also follow', description: '• [Discord Terms of Service](https://discord.com/terms)\n• [Discord Community Guidelines](https://discord.com/guidelines)\n\nQuestions? Ask a mod. Ideas? Go to #commands and type **/suggest**.' }] });
+// /post-rules: (re)post the rules in #rules, removing the bot's older rules posts there
+async function postRules(i, env) {
+  if (!canManage(i)) return secret('Only server managers can do this.');
+  const call = bot(env), gid = i.guild_id;
+  let ch = i.channel_id || i.channel?.id;
+  try {
+    const w = (await call(`/guilds/${gid}/channels`)).find(c => c.type === 0 && /rules/i.test(c.name)); if (w) ch = w.id;
+    const old = (await call(`/channels/${ch}/messages?limit=50`)).filter(m => m.author?.id === env.DISCORD_APP_ID && (m.embeds || []).some(e => /rules/i.test(e.title || '')));
+    for (const m of old.slice(0, 5)) await call(`/channels/${ch}/messages/${m.id}`, 'DELETE').catch(() => {});
+    await call(`/channels/${ch}/messages`, 'POST', { ...rulesMessage(), allowed_mentions: { parse: [] } });
+    return secret(`✅ Posted the rules in <#${ch}>.`);
+  } catch (e) {
+    return secret(/^403/.test(String(e.message)) ? "❌ I can't post there. Give the FrameUp role View Channel + Send Messages in that channel." : '❌ Discord error: ' + e.message);
+  }
+}
 // /post-website: (re)post the website card with the banner in #website, removing the bot's older website posts there
 async function postWebsite(i, env) {
   if (!canManage(i)) return secret('Only server managers can do this.');
@@ -487,6 +507,7 @@ async function interaction(i, env, ctx) {
   const name = i.data.name;
   if (name === 'website') return reply(websiteMessage());
   if (name === 'post-website') return postWebsite(i, env);
+  if (name === 'post-rules') return postRules(i, env);
   if (name === 'rate' || name === 'Rate this edit') return rateStart(i);
   if (name === 'settings') return settingsReply(i);
   if (name === 'suggest') return suggestPost(i, env);
