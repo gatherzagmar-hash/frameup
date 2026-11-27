@@ -236,6 +236,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Archivo,syste
   </div>
 
   <p class="summary" id="summary"></p>
+  <p class="summary" id="fpsnote" hidden></p>
 
   <details class="adv" id="adv" hidden>
     <summary>Settings <span>best by default</span></summary>
@@ -517,6 +518,8 @@ async function probeFile(f, name) {
 }
 function showInfo(f, p) {
   setMeta($('meta'), [['File', f.name], ['Size', mb(f.size)], ['Resolution', info.w ? `${info.w}×${info.h}` : '—'], ['Length', info.duration ? fmt(info.duration) : '—'], ['FPS', p && p.fps ? String(Math.round(p.fps)) : (info.fps ? String(info.fps) : '—')], ['Codec', p && p.codec ? p.codec.toUpperCase() : '—']]);
+  const sf = (p && p.fps) || info.fps, n = $('fpsnote');
+  if (n) { n.hidden = !(sf && sf < 50); n.innerHTML = '💡 Your edit is <b>' + Math.round(sf || 0) + ' FPS</b>. The Method adds real in-between frames to make it 60, but for the smoothest result export your edit at <b>60 FPS</b> in your editing app.'; }
 }
 
 /* ================= wczytywanie pliku ================= */
@@ -575,7 +578,8 @@ function buildArgs(inName, p) {
   let outFps = Math.round(sf), fpsF = null;
   const tf = +S.fps;
   if (tf && sf < tf - 0.5) {
-    fpsF = S.interp === 'mci' ? `minterpolate=fps=${tf}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1:scd=fdiff:scd_threshold=8` : `minterpolate=fps=${tf}:mi_mode=blend:scd=fdiff:scd_threshold=8`;
+    // real in-between frames (motion analysis), so 30 FPS edits really move like 60 instead of blended ghost frames
+    fpsF = S.fast ? `minterpolate=fps=${tf}:mi_mode=blend:scd=fdiff:scd_threshold=8` : `minterpolate=fps=${tf}:mi_mode=mci:mc_mode=obmc:me_mode=bilat:me=epzs:mb_size=16:search_param=16:vsbmc=0:scd=fdiff:scd_threshold=8`;
     outFps = tf;
   } else if (tf && sf > tf + 0.5) { fpsF = `fps=${tf}`; outFps = tf; }
   else if (!tf && sf > 60.5) { fpsF = 'fps=60'; outFps = 60; }
@@ -592,9 +596,9 @@ function buildArgs(inName, p) {
   const br = +S.br, heavy = short > 1080 || outFps > 60;
   const venc = S.codec === 'hevc'
     ? ['-c:v', 'libx265', '-preset', S.hq ? 'fast' : (heavy || S.fast ? 'ultrafast' : 'superfast'), '-crf', '19', '-tag:v', 'hvc1', '-x265-params', 'log-level=error']
-    : ['-c:v', 'libx264', '-preset', S.hq ? 'medium' : (S.fast ? 'ultrafast' : heavy ? 'superfast' : 'veryfast'), '-profile:v', 'high', '-crf', '17'];
+    : ['-c:v', 'libx264', '-preset', S.hq ? 'medium' : (S.fast ? 'ultrafast' : heavy ? 'superfast' : 'veryfast'), '-profile:v', 'high', '-level:v', outFps > 60 || short > 1080 ? '5.1' : '4.2', '-bf', '2', '-crf', '17'];
   const args = ['-hide_banner', '-i', inName, '-map', '0:v:0', '-map', '0:a:0?', '-vf', vf.join(','), '-fps_mode', 'cfr', '-r', String(outFps),
-    ...venc, '-maxrate', br + 'M', '-bufsize', br * 2 + 'M', '-g', String(outFps * 2),
+    ...venc, '-maxrate', br + 'M', '-bufsize', br * 2 + 'M', '-g', String(outFps), '-keyint_min', String(outFps),
     '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709',
     '-c:a', 'aac', '-b:a', '320k', '-ar', '48000',
     '-map_metadata', '-1', '-map_chapters', '-1', '-metadata', 'handler_name=VideoHandler', '-movflags', '+faststart', 'out.mp4'];
