@@ -51,7 +51,7 @@ export async function checkEmbed(url) {
         { name: '🔖 Saves', value: short(d.stats?.saves), inline: true },
         { name: '🎞️ Best quality', value: `${label(b.width, b.height)}${b.codec ? ' · ' + b.codec : ''}${b.fps ? ' · ' + b.fps + ' FPS' : ''}${b.bitrateKbps ? ' · ' + (b.bitrateKbps / 1000).toFixed(1) + ' Mbps' : ''}`, inline: true }
       ],
-      footer: { text: 'FrameUp · frameup-pl.netlify.app' }
+      footer: { text: 'FrameUp · frameupmethod.github.io' }
     }]
   };
 }
@@ -98,7 +98,7 @@ async function announce(i) {
   const val = id => { for (const row of i.data.components || []) for (const c of row.components || []) if (c.custom_id === id) return String(c.value || '').trim(); return ''; };
   const title = val('title'), body = val('body'), image = val('image');
   const ping = String(i.data.custom_id).endsWith(':1');
-  const embed = { color: ORANGE, description: body, footer: { text: 'FrameUp · frameup-pl.netlify.app' }, timestamp: new Date().toISOString() };
+  const embed = { color: ORANGE, description: body, footer: { text: 'FrameUp · frameupmethod.github.io' }, timestamp: new Date().toISOString() };
   if (title) embed.title = title;
   if (/^https:\/\/\S+$/i.test(image)) embed.image = { url: image };
   try {
@@ -126,6 +126,12 @@ export default async (req, context) => {
   if (i.type !== 2) return secret('Unsupported.');
   if (i.data.name === 'rate' || i.data.name === 'Rate this edit') return rateStart(i);
   if (i.data.name === 'settings') return settingsReply(i);
+  if (i.data.name === 'website') return reply({
+    embeds: [{ color: ORANGE, title: '🎬 FrameUp – the best TikTok quality method', url: 'https://frameupmethod.github.io/',
+      description: 'Drop your edit, press one button, get **1080p 60 FPS** tuned for TikTok. Free, runs in your browser.\n\nAlso check any TikTok: views, likes and the quality TikTok serves.',
+      footer: { text: 'frameupmethod.github.io' } }],
+    components: [{ type: 1, components: [{ type: 2, style: 5, label: 'Open FrameUp', url: 'https://frameupmethod.github.io/' }] }]
+  });
   if (i.data.name === 'roles') return canManage(i) ? rolesPost(i) : secret('Only server managers can post the role picker.');
 
   if (i.data.name === 'announce') {
