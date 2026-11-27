@@ -33,6 +33,7 @@ export const COMMANDS = [
   { name: 'suggest', description: 'Send an idea for the server or the website', dm_permission: false,
     options: [{ name: 'idea', description: 'Your idea', type: 3, required: true, max_length: 1000 }] },
   { name: 'suggest-channel', description: 'Make this channel the one where /suggest ideas are posted', default_member_permissions: MANAGE, dm_permission: false },
+  { name: 'post-website', description: 'Post the website link + banner in #website', default_member_permissions: MANAGE, dm_permission: false },
   { name: 'setup', description: 'Create the FrameUp channels (INFO + EDITS). Safe to run again.', default_member_permissions: MANAGE, dm_permission: false },
   { name: 'roles', description: 'Post the editing app role picker here', default_member_permissions: MANAGE, dm_permission: false },
   { name: 'announce', description: 'Post an announcement in #announcements as FrameUp', default_member_permissions: MANAGE, dm_permission: false,
@@ -329,8 +330,24 @@ const VIEW = 1n << 10n, SEND = 1n << 11n, EMBED = 1n << 14n, HISTORY = 1n << 16n
 const intro = (title, description) => ({ embeds: [{ color: ORANGE, title, description, footer: FOOT }] });
 const websiteMessage = () => ({
   embeds: [{ color: ORANGE, title: '🎬 FrameUp – the best TikTok quality method', url: SITE,
-    description: 'Drop your edit, press one button, get **1080p 60 FPS** tuned for TikTok. Free, runs in your browser.\n\nAlso check any TikTok: views, likes and the quality TikTok serves.', footer: { text: 'frameupmethod.github.io' } }],
-  components: [{ type: 1, components: [{ type: 2, style: 5, label: 'Open FrameUp', url: SITE }] }] });
+    description: 'Drop your edit, press one button, get **1080p 60 FPS** tuned for TikTok. Free, runs in your browser.\n\nAlso check any TikTok: views, likes and the quality TikTok serves.\n\n🔗 **' + SITE + '**',
+    image: { url: SITE + 'banner.webp' }, footer: { text: 'frameupmethod.github.io' } }],
+  components: [{ type: 1, components: [{ type: 2, style: 5, label: 'Open FrameUp', url: SITE }, { type: 2, style: 5, label: 'All links', url: SITE + 'links/' }] }] });
+// /post-website: (re)post the website card with the banner in #website, removing the bot's older website posts there
+async function postWebsite(i, env) {
+  if (!canManage(i)) return secret('Only server managers can do this.');
+  const call = bot(env), gid = i.guild_id;
+  let ch = i.channel_id || i.channel?.id;
+  try {
+    const w = (await call(`/guilds/${gid}/channels`)).find(c => c.type === 0 && /website/i.test(c.name)); if (w) ch = w.id;
+    const old = (await call(`/channels/${ch}/messages?limit=50`)).filter(m => m.author?.id === env.DISCORD_APP_ID && (m.embeds || []).some(e => /FrameUp/.test(e.title || '')));
+    for (const m of old.slice(0, 5)) await call(`/channels/${ch}/messages/${m.id}`, 'DELETE').catch(() => {});
+    await call(`/channels/${ch}/messages`, 'POST', { ...websiteMessage(), allowed_mentions: { parse: [] } });
+    return secret(`✅ Posted the website card in <#${ch}>.`);
+  } catch (e) {
+    return secret(/^403/.test(String(e.message)) ? "❌ I can't post there. Give the FrameUp role View Channel + Send Messages in that channel." : '❌ Discord error: ' + e.message);
+  }
+}
 const RULES = [
   'Be respectful. No hate, harassment or drama.',
   'No spam, no self-promo outside #edit-rate, no invite links.',
@@ -468,10 +485,8 @@ async function interaction(i, env, ctx) {
   if (i.type === 5 && String(i.data.custom_id || '').startsWith('announce')) return announceSubmit(i, env);
   if (i.type !== 2) return secret('Unsupported.');
   const name = i.data.name;
-  if (name === 'website') return reply({
-    embeds: [{ color: ORANGE, title: '🎬 FrameUp – the best TikTok quality method', url: SITE,
-      description: 'Drop your edit, press one button, get **1080p 60 FPS** tuned for TikTok. Free, runs in your browser.\n\nAlso check any TikTok: views, likes and the quality TikTok serves.', footer: { text: 'frameupmethod.github.io' } }],
-    components: [{ type: 1, components: [{ type: 2, style: 5, label: 'Open FrameUp', url: SITE }] }] });
+  if (name === 'website') return reply(websiteMessage());
+  if (name === 'post-website') return postWebsite(i, env);
   if (name === 'rate' || name === 'Rate this edit') return rateStart(i);
   if (name === 'settings') return settingsReply(i);
   if (name === 'suggest') return suggestPost(i, env);
