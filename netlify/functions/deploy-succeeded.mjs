@@ -9,6 +9,7 @@ const user = { name: 'user', description: 'Member', type: 6, required: true };
 const reason = { name: 'reason', description: 'Reason (shown in the audit log)', type: 3, required: false, max_length: 300 };
 
 export const COMMANDS = [
+  { name: 'website', description: 'Get the link to the FrameUp website', dm_permission: false },
   { name: 'rate', description: 'Let people rate an edit 1-10', dm_permission: false,
     options: [{ name: 'link', description: 'Link to the edit (TikTok, YouTube, Discord message...)', type: 3, required: true }] },
   { name: 'Rate this edit', type: 3, dm_permission: false },
@@ -57,7 +58,7 @@ export const handler = async (event) => {
   const prod = !deploy.context || deploy.context === 'production';
   const channel = process.env.DISCORD_ANNOUNCE_CHANNEL;
   if ((DISCORD_ANNOUNCE_WEBHOOK || (channel && DISCORD_TOKEN)) && prod && !/\[skip\]/i.test(title)) {
-    const site = deploy.ssl_url || deploy.url || process.env.URL || 'https://frameup-pl.netlify.app';
+    const site = 'https://frameupmethod.github.io/';
     const embeds = [{
       color: 0xff4d1a,
       title: '🚀 FrameUp just got an update',
