@@ -1,0 +1,12 @@
+name = "frameup-bot"
+main = "index.js"
+compatibility_date = "2025-06-01"
+
+[vars]
+DISCORD_PUBLIC_KEY = "7995d8375affd192e830f9da39a3fc0e1d1262168c0b14e63f117d7997ecee27"
+DISCORD_APP_ID = "1575533630451753062"
+DISCORD_ANNOUNCE_CHANNEL = "1575453244279496774"
+
+[[kv_namespaces]]
+binding = "VOTES"
+id = "6919aa7859b14fb6ad68a11267bca32a"
