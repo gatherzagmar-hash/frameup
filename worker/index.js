@@ -33,6 +33,7 @@ export const COMMANDS = [
   { name: 'suggest', description: 'Send an idea for the server or the website', dm_permission: false,
     options: [{ name: 'idea', description: 'Your idea', type: 3, required: true, max_length: 1000 }] },
   { name: 'suggest-channel', description: 'Make this channel the one where /suggest ideas are posted', default_member_permissions: MANAGE, dm_permission: false },
+  { name: 'setup', description: 'Create the FrameUp channels (INFO + EDITS). Safe to run again.', default_member_permissions: MANAGE, dm_permission: false },
   { name: 'roles', description: 'Post the editing app role picker here', default_member_permissions: MANAGE, dm_permission: false },
   { name: 'announce', description: 'Post an announcement in #announcements as FrameUp', default_member_permissions: MANAGE, dm_permission: false,
     options: [{ name: 'ping', description: 'Ping @everyone', type: 5, required: false }] },
@@ -260,18 +261,21 @@ const PICK_ROLES = [
   { name: 'Alight Motion', color: 0x3ddc84, emoji: '🟢' }, { name: 'Premiere Pro', color: 0x7b68ee, emoji: '🎞️' },
   { name: 'Video Star', color: 0xffc83d, emoji: '⭐' }, { name: 'Vegas Pro', color: 0x4fa3ff, emoji: '🔵' }
 ];
+async function rolePickerMessage(env, gid) {
+  const call = bot(env);
+  const existing = await call(`/guilds/${gid}/roles`), ids = [];
+  for (const r of PICK_ROLES) {
+    let role = existing.find(x => x.name.toLowerCase() === r.name.toLowerCase());
+    if (!role) role = await call(`/guilds/${gid}/roles`, 'POST', { name: r.name, color: r.color, mentionable: false, permissions: '0' });
+    ids.push(role.id);
+  }
+  const buttons = PICK_ROLES.map((r, k) => ({ type: 2, style: 2, label: r.name, emoji: { name: r.emoji }, custom_id: 'role:' + ids[k] }));
+  return { embeds: [{ color: ORANGE, title: '🎨 What do you edit with?', description: 'Click to get a role for your editing app. Click again to remove it. You can pick more than one.' }],
+    components: [{ type: 1, components: buttons.slice(0, 3) }, { type: 1, components: buttons.slice(3) }] };
+}
 async function rolesPost(i, env) {
-  const call = bot(env), gid = i.guild_id;
   try {
-    const existing = await call(`/guilds/${gid}/roles`), ids = [];
-    for (const r of PICK_ROLES) {
-      let role = existing.find(x => x.name.toLowerCase() === r.name.toLowerCase());
-      if (!role) role = await call(`/guilds/${gid}/roles`, 'POST', { name: r.name, color: r.color, mentionable: false, permissions: '0' });
-      ids.push(role.id);
-    }
-    const buttons = PICK_ROLES.map((r, k) => ({ type: 2, style: 2, label: r.name, emoji: { name: r.emoji }, custom_id: 'role:' + ids[k] }));
-    return reply({ embeds: [{ color: ORANGE, title: '🎨 What do you edit with?', description: 'Click to get a role for your editing app. Click again to remove it. You can pick more than one.' }],
-      components: [{ type: 1, components: buttons.slice(0, 3) }, { type: 1, components: buttons.slice(3) }] });
+    return reply(await rolePickerMessage(env, i.guild_id));
   } catch (e) {
     return secret(/^403/.test(String(e.message)) ? '❌ I need the **Manage Roles** permission. Server Settings → Roles → FrameUp → turn on Manage Roles.' : '❌ Discord error: ' + e.message);
   }
@@ -298,9 +302,89 @@ const SETTINGS = {
   premiere: { title: 'Premiere Pro → TikTok', lines: ['**Format:** H.264 · **Preset:** Match Source – High bitrate', '**Size:** 1080×1920 · **Frame rate:** same as sequence', '**Bitrate:** VBR 2 pass · Target 30 Mbps · Max 50 Mbps', '**Use Maximum Render Quality**: on', '**Audio:** AAC · 48 kHz · 320 kbps'] },
   alight: { title: 'Alight Motion → TikTok', lines: ['Export → **Video**', '**Resolution:** 1080p', '**Frame rate:** same as project (30 or 60)', '**Quality:** 100%', '**Format:** MP4'] }
 };
+const settingsEmbed = key => { const s = SETTINGS[key] || SETTINGS.capcut; return { color: ORANGE, title: '⚙️ ' + s.title, description: s.lines.map(l => '• ' + l).join('\n') + '\n\n' + TIP, footer: { text: 'FrameUp · best TikTok export settings' } }; };
 function settingsReply(i) {
-  const s = SETTINGS[String(opt(i, 'app') || 'capcut')] || SETTINGS.capcut;
-  return reply({ embeds: [{ color: ORANGE, title: '⚙️ ' + s.title, description: s.lines.map(l => '• ' + l).join('\n') + '\n\n' + TIP, footer: { text: 'FrameUp · best TikTok export settings' } }] });
+  return reply({ embeds: [settingsEmbed(String(opt(i, 'app') || 'capcut'))] });
+}
+
+/* ---------------- server setup ---------------- */
+const VIEW = 1n << 10n, SEND = 1n << 11n, EMBED = 1n << 14n, HISTORY = 1n << 16n, REACT = 1n << 6n;
+const intro = (title, description) => ({ embeds: [{ color: ORANGE, title, description, footer: FOOT }] });
+const websiteMessage = () => ({
+  embeds: [{ color: ORANGE, title: '🎬 FrameUp – the best TikTok quality method', url: SITE,
+    description: 'Drop your edit, press one button, get **1080p 60 FPS** tuned for TikTok. Free, runs in your browser.\n\nAlso check any TikTok: views, likes and the quality TikTok serves.', footer: { text: 'frameupmethod.github.io' } }],
+  components: [{ type: 1, components: [{ type: 2, style: 5, label: 'Open FrameUp', url: SITE }] }] });
+const RULES = [
+  'Be respectful. No hate, harassment or drama.',
+  'No spam, no self-promo outside #edit-rate, no invite links.',
+  'Give credit. Don\'t repost other people\'s edits as your own.',
+  'Feedback should help: say what to improve, not just "bad".',
+  'No NSFW, gore or shocking content.',
+  'Use the right channel for everything.',
+  'Listen to the mods. Breaking rules = timeout, kick or ban.'
+];
+// Channels the /setup command makes. readOnly = only the bot can write (people can still use slash commands).
+const LAYOUT = [
+  { category: '📢 INFO', channels: [
+    { name: 'announcements', readOnly: true, id: 'ANNOUNCE' },
+    { name: 'rules', readOnly: true, topic: 'Server rules', post: () => [intro('📜 FrameUp rules', RULES.map((r, k) => `**${k + 1}.** ${r}`).join('\n\n'))] },
+    { name: 'website', readOnly: true, topic: 'frameupmethod.github.io', post: () => [websiteMessage()] },
+    { name: 'roles', readOnly: true, topic: 'Pick your editing app', post: async (env, gid) => [await rolePickerMessage(env, gid)] },
+    { name: 'suggestions', readOnly: true, topic: 'Ideas for the server and website. Use /suggest', suggest: true,
+      post: () => [intro('💡 Suggestions', 'Got an idea for the server or the website?\nType **/suggest** and write it. Your idea shows up here and everyone can vote 👍 or 👎.')] }
+  ] },
+  { category: '🎬 EDITS', channels: [
+    { name: 'edit-rate', topic: 'Post your edits and let people rate them 1-10. Use /rate', post: () => [intro('⭐ Edit rate',
+      'Show your edits and get rated **1–10**.\n\n• Type **/rate** and paste the link to your edit (TikTok, YouTube...)\n• Or post the video here, then **right-click the message → Apps → Rate this edit**\n\nEveryone clicks a number, the bot shows the average. Be honest but helpful.')] },
+    { name: 'check', topic: 'Check TikTok quality and stats. Use /check and /tiktok', post: () => [intro('🔍 Check',
+      '• **/check** + TikTok link: views, likes, comments and the quality TikTok serves (resolution, FPS, bitrate)\n• **/tiktok** + @nick: profile stats (followers, likes, videos)\n\nIs your upload not HD? Run it through the Method on the website first.')] },
+    { name: 'export-settings', readOnly: true, topic: 'Best export settings for TikTok. Use /settings', post: () => [
+      intro('⚙️ Export settings', 'Best export settings for TikTok in every app. You can also type **/settings** anywhere.'),
+      ...['capcut', 'ae', 'premiere', 'alight'].map(k => ({ embeds: [settingsEmbed(k)] }))] }
+  ] }
+];
+async function serverSetup(i, env) {
+  const call = bot(env), gid = i.guild_id, me = env.DISCORD_APP_ID, done = [];
+  let channels = await call(`/guilds/${gid}/channels`);
+  const byName = (name, type) => channels.find(c => c.type === type && c.name.toLowerCase().replace(/[^a-z0-9-]/g, '') === name.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+  const lockFor = ro => ro ? [
+    { id: gid, type: 0, allow: '0', deny: String(SEND) },
+    { id: me, type: 1, allow: String(VIEW | SEND | EMBED | HISTORY | REACT), deny: '0' }] : undefined;
+  let pos = 0;
+  for (const group of LAYOUT) {
+    let cat = byName(group.category, 4);
+    if (!cat) { cat = await call(`/guilds/${gid}/channels`, 'POST', { name: group.category, type: 4 }); channels.push(cat); done.push(`created category **${group.category}**`); }
+    for (const ch of group.channels) {
+      let c = ch.id === 'ANNOUNCE' && env.DISCORD_ANNOUNCE_CHANNEL ? channels.find(x => x.id === env.DISCORD_ANNOUNCE_CHANNEL) : null;
+      c = c || byName(ch.name, 0);
+      let fresh = false;
+      if (!c) {
+        c = await call(`/guilds/${gid}/channels`, 'POST', { name: ch.name, type: 0, parent_id: cat.id, topic: ch.topic, permission_overwrites: lockFor(ch.readOnly) });
+        channels.push(c); fresh = true; done.push(`created <#${c.id}>`);
+      } else if (c.parent_id !== cat.id) {
+        await call(`/channels/${c.id}`, 'PATCH', { parent_id: cat.id, lock_permissions: false });
+        done.push(`moved <#${c.id}> to **${group.category}**`);
+      }
+      pos++;
+      if (ch.suggest) await env.VOTES.put('suggest-channel:' + gid, c.id);
+      if (fresh && ch.post) for (const msg of await ch.post(env, gid)) await call(`/channels/${c.id}/messages`, 'POST', { ...msg, allowed_mentions: { parse: [] } });
+    }
+  }
+  return done;
+}
+async function setupCommand(i, env, ctx) {
+  if (!canManage(i)) return secret('Only server managers can run the setup.');
+  ctx.waitUntil((async () => {
+    let content;
+    try {
+      const done = await serverSetup(i, env);
+      content = done.length ? '✅ Server set up:\n' + done.map(d => '• ' + d).join('\n') + '\n\nRun it again anytime, it only adds what is missing.' : '✅ Everything is already set up.';
+    } catch (e) {
+      content = /^403/.test(String(e.message)) ? '❌ I need the **Manage Channels** permission. Server Settings → Roles → FrameUp → turn on **Manage Channels** (and Manage Roles), then run /setup again.' : '❌ Setup stopped: ' + e.message + '\nRun /setup again, it continues where it stopped.';
+    }
+    await fetch(`${API}/webhooks/${i.application_id}/${i.token}/messages/@original`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content: content.slice(0, 1900) }) });
+  })());
+  return json({ type: 5, data: { flags: 64 } });
 }
 
 /* ---------------- announcements ---------------- */
@@ -375,6 +459,7 @@ async function interaction(i, env, ctx) {
   if (name === 'settings') return settingsReply(i);
   if (name === 'suggest') return suggestPost(i, env);
   if (name === 'suggest-channel') return suggestSetChannel(i, env);
+  if (name === 'setup') return setupCommand(i, env, ctx);
   if (name === 'tiktok') {
     const user = opt(i, 'user');
     ctx.waitUntil((async () => {
