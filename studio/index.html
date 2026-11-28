@@ -23,7 +23,7 @@
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Poppins,system-ui,sans-serif;overflow-x:clip}
 header{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line)}
 header h1{font-size:18px;margin:0;font-weight:700}header h1 b{color:var(--or)}
-header a{color:var(--dim);text-decoration:none;margin-left:auto;font-size:13px}header .btn+a{margin-left:0}
+header a{color:var(--dim);text-decoration:none;margin-left:auto;font-size:13px}header .btn+a{margin-left:0}.ihelp{position:fixed;top:60px;right:16px;max-width:320px;background:#1c1c23;border:1px solid #ff4d1a;border-radius:12px;padding:14px;font-size:13px;z-index:9;box-shadow:0 10px 40px #000a}.ihelp b{color:#ff7a2c}
 .wrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;padding:14px;max-width:1300px;margin:0 auto}
 .view{background:#050507;border:1px solid var(--line);border-radius:14px;display:flex;align-items:center;justify-content:center;min-height:440px;height:min(68vh,760px);position:relative;overflow:hidden}
 canvas#c{max-width:100%;max-height:100%;border-radius:6px;background:#000}
@@ -66,7 +66,7 @@ a.dl{display:block;margin-top:10px;text-align:center;text-decoration:none}
 </style>
 </head>
 <body>
-<header><h1>Frame<b>Up</b> Studio</h1><span class="kbd">effects · color · beats · export</span><button class="btn main" id="install" hidden style="margin-left:auto;padding:8px 14px;min-height:38px">⬇ Install app</button><a href="../">← FrameUp Method</a></header>
+<header><h1>Frame<b>Up</b> Studio</h1><span class="kbd">effects · color · beats · export</span><button class="btn main" id="install" style="margin-left:auto;padding:8px 14px;min-height:38px">⬇ Install app</button><a href="../">← FrameUp Method</a></header>
 <div class="wrap">
   <div class="view" id="view">
     <canvas id="c" width="1080" height="1920"></canvas>
@@ -254,9 +254,14 @@ $('export').onclick=async()=>{
 renderTL();
 // ---------- installable app ----------
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
-let ip=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();ip=e;$('install').hidden=false});
-$('install').onclick=async()=>{if(!ip)return;ip.prompt();await ip.userChoice;ip=null;$('install').hidden=true};
-addEventListener('appinstalled',()=>{$('install').hidden=true});
+let ip=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();ip=e});
+$('install').onclick=async()=>{if(ip){ip.prompt();await ip.userChoice;ip=null;return}
+  let h=document.querySelector('.ihelp');if(h){h.remove();return}h=document.createElement('div');h.className='ihelp';
+  const ios=/iPhone|iPad/.test(navigator.userAgent),android=/Android/.test(navigator.userAgent),edge=/Edg\//.test(navigator.userAgent);
+  h.innerHTML=matchMedia('(display-mode: standalone)').matches?'✅ FrameUp Studio is already installed and open as an app.':ios?'In <b>Safari</b>: tap <b>Share</b> (square with arrow) → <b>Add to Home Screen</b>.':android?'In <b>Chrome</b>: tap <b>⋮</b> → <b>Install app</b> (or <b>Add to Home screen</b>).':edge?'In <b>Edge</b>: click <b>…</b> (top right) → <b>Apps</b> → <b>Install this site as an app</b>.':'In <b>Chrome</b>: click the <b>install icon</b> at the right end of the address bar, or <b>⋮</b> → <b>Cast, save and share</b> → <b>Install page as app</b>.';
+  h.onclick=()=>h.remove();document.body.appendChild(h)};
+if(matchMedia('(display-mode: standalone)').matches)$('install').hidden=true;
+addEventListener('appinstalled',()=>{$('install').hidden=true;document.querySelector('.ihelp')?.remove()});
 }
 </script>
 </body>
