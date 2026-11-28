@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FrameUp Studio</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b0b0e">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -17,7 +23,7 @@
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Poppins,system-ui,sans-serif;overflow-x:clip}
 header{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line)}
 header h1{font-size:18px;margin:0;font-weight:700}header h1 b{color:var(--or)}
-header a{color:var(--dim);text-decoration:none;margin-left:auto;font-size:13px}
+header a{color:var(--dim);text-decoration:none;margin-left:auto;font-size:13px}header .btn+a{margin-left:0}
 .wrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;padding:14px;max-width:1300px;margin:0 auto}
 .view{background:#050507;border:1px solid var(--line);border-radius:14px;display:flex;align-items:center;justify-content:center;min-height:440px;height:min(68vh,760px);position:relative;overflow:hidden}
 canvas#c{max-width:100%;max-height:100%;border-radius:6px;background:#000}
@@ -60,7 +66,7 @@ a.dl{display:block;margin-top:10px;text-align:center;text-decoration:none}
 </style>
 </head>
 <body>
-<header><h1>Frame<b>Up</b> Studio</h1><span class="kbd">effects · color · beats · export</span><a href="../">← FrameUp Method</a></header>
+<header><h1>Frame<b>Up</b> Studio</h1><span class="kbd">effects · color · beats · export</span><button class="btn main" id="install" hidden style="margin-left:auto;padding:8px 14px;min-height:38px">⬇ Install app</button><a href="../">← FrameUp Method</a></header>
 <div class="wrap">
   <div class="view" id="view">
     <canvas id="c" width="1080" height="1920"></canvas>
@@ -246,6 +252,11 @@ $('export').onclick=async()=>{
   const tick=()=>{$('prog').style.width=(v.currentTime/dur*100)+'%';if(!v.ended&&!v.paused)requestAnimationFrame(tick)};tick();
   v.onended=()=>{setTimeout(()=>rec.stop(),150);v.onended=null}};
 renderTL();
+// ---------- installable app ----------
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+let ip=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();ip=e;$('install').hidden=false});
+$('install').onclick=async()=>{if(!ip)return;ip.prompt();await ip.userChoice;ip=null;$('install').hidden=true};
+addEventListener('appinstalled',()=>{$('install').hidden=true});
 }
 </script>
 </body>
